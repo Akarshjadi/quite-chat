@@ -17,8 +17,10 @@ export default function OwnerInvitationsPage() {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [invitations, setInvitations] = useState<Invitation[]>([])
+  const [otherMember, setOtherMember] = useState<{ user_id: string; display_name: string | null } | null>(null)
   const [copyUrl, setCopyUrl] = useState("")
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
   const [loading, setLoading] = useState(true)
 
   async function load() {
@@ -47,15 +49,35 @@ export default function OwnerInvitationsPage() {
       .select("created_by")
       .eq("id", convId)
       .single()
-    setIsOwner(conv?.created_by === session.user.id)
+    const owner = conv?.created_by === session.user.id
+    setIsOwner(owner)
 
-    if (conv?.created_by === session.user.id) {
+    if (owner) {
       const { data: invs } = await supabase
         .from("invitations")
         .select("id, invited_email, created_at, expires_at, accepted_at, revoked_at")
         .eq("conversation_id", convId)
         .order("created_at", { ascending: false })
       setInvitations((invs as Invitation[]) ?? [])
+
+      // Find the other member (the invitee).
+      const { data: others } = await supabase
+        .from("conversation_members")
+        .select("user_id")
+        .eq("conversation_id", convId)
+        .neq("user_id", session.user.id)
+        .limit(1)
+      const otherUserId = others?.[0]?.user_id
+      if (otherUserId) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", otherUserId)
+          .single()
+        setOtherMember({ user_id: otherUserId, display_name: prof?.display_name ?? null })
+      } else {
+        setOtherMember(null)
+      }
     }
     setLoading(false)
   }
@@ -89,6 +111,46 @@ export default function OwnerInvitationsPage() {
     )
     if (res.ok) load()
     else setError((await res.json().catch(() => ({}))).error ?? "Could not revoke.")
+  }
+
+  async function revokeSession() {
+    if (!otherMember) return
+    if (!confirm(`Revoke ${otherMember.display_name ?? "the other participant"}'s access?`)) return
+    setError("")
+    setNotice("")
+    const res = await fetch("/api/admin/revoke-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ target_user_id: otherMember.user_id }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setNotice("Participant access revoked.")
+      load()
+    } else {
+      setError(body.error ?? "Could not revoke access.")
+    }
+  }
+
+  async function deleteRoom() {
+    if (!conversationId) return
+    if (!confirm("Delete this room permanently? All messages will be removed and both participants lose access.")) return
+    setError("")
+    setNotice("")
+    const res = await fetch("/api/admin/delete-room", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ conversation_id: conversationId }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setNotice("Room deleted. All participants have lost access.")
+      load()
+    } else {
+      setError(body.error ?? "Could not delete the room.")
+    }
   }
 
   if (loading) return <div className="p-6 text-[#AAB6C8]">Loading…</div>
@@ -130,7 +192,21 @@ export default function OwnerInvitationsPage() {
           </div>
         )}
 
+        {otherMember && (
+          <div className="bg-[#1F2937] border border-[#374151] rounded-xl p-3 text-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span>
+                Participant: <strong>{otherMember.display_name ?? "unnamed"}</strong>
+              </span>
+              <button onClick={revokeSession} className="text-[#EF4444] underline">
+                revoke access
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && <p className="text-xs text-[#EF4444]">{error}</p>}
+        {notice && <p className="text-xs text-[#D8C6A1]">{notice}</p>}
 
         {invitations.length > 0 && (
           <div className="space-y-2">
@@ -153,6 +229,18 @@ export default function OwnerInvitationsPage() {
             ))}
           </div>
         )}
+
+        <div className="border-t border-[#374151] pt-4">
+          <button
+            onClick={deleteRoom}
+            className="px-5 py-2.5 bg-[#EF4444] text-white font-medium rounded-xl text-sm"
+          >
+            Delete room
+          </button>
+          <p className="text-[10px] text-[#AAB6C8] mt-1">
+            Deleting the room removes all messages and revokes access for both participants.
+          </p>
+        </div>
       </div>
     </div>
   )
