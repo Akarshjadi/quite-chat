@@ -8,6 +8,12 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      # The Supabase client must have these to construct; they are public
+      # placeholders for the build only. Real values come from Vercel/CI
+      # secrets in dev/prod.
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
