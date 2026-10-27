@@ -7,8 +7,9 @@ import { cookies } from "next/headers"
  * browser bundle.
  */
 export function createServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co"
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? "placeholder-service-role-key"
   return createServerClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -19,8 +20,8 @@ export function createServiceClient() {
  * their cookies. Used for reads that must be governed by RLS.
  */
 export function createAuthenticatedClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co"
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder-anon-key"
   const cookieStore = cookies()
   return createServerClient(url, anonKey, {
     auth: {
