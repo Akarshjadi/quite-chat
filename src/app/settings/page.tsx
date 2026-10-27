@@ -1,7 +1,7 @@
 "use client"
 
 import { createClient } from "@/lib/supabase/browser"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 export default function SettingsPage() {
   const supabase = createClient()
@@ -10,11 +10,7 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState("")
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [supabase])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const {
       data: { session },
     } = await supabase.auth.getSession()
@@ -30,7 +26,11 @@ export default function SettingsPage() {
       setDisplayName(data?.display_name ?? "")
     }
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   async function saveName() {
     if (!user) return
